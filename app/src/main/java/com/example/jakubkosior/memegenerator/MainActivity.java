@@ -3,16 +3,26 @@ package com.example.jakubkosior.memegenerator;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.squareup.picasso.Picasso;
+
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -23,11 +33,78 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        Button shareButton = (Button) this.findViewById(R.id.share_button);
+
+        shareButton.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+                sharePhoto();
+            }
+        });
+
+    }
+
+    private void sharePhoto() {
+        createComposite();
+        createShareIntent();
+    }
+
+    private void createShareIntent() {
+        Intent sendIntent = new Intent(Intent.ACTION_SEND);
+
+        File image = new File(getCacheDir(), "images/image.png");
+        Uri imageUri = FileProvider.getUriForFile(
+                    this,
+                    "com.mydomain.fileprovider",
+                    image);
+
+        sendIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
+        sendIntent.setType("image/png");
+
+        startActivity(sendIntent);
+    }
+
+    private void createComposite() {
+        /**
+         * Creation of composite image
+         */
+        FrameLayout meme = (FrameLayout) findViewById(R.id.meme_layout);
+        meme.setDrawingCacheEnabled(true);
+        Bitmap bitmap = meme.getDrawingCache();
+
+        File sharedFile = new File(
+                getCacheDir(),
+                "images"
+            );
+
+
+        sharedFile.mkdirs();
+
+        try {
+            FileOutputStream stream = new FileOutputStream(sharedFile + "/image.png");
+
+            bitmap.compress(
+                    Bitmap.CompressFormat.PNG,
+                    100,
+                    stream
+                );
+
+            stream.close();
+
+        } catch (IOException e) {
+
+            e.printStackTrace();
+
+        }
+
+        meme.setDrawingCacheEnabled(false);
+        meme.destroyDrawingCache();
     }
 
     public void pickPhotoFromGallery(View v){
-
-
+        requestPermission();
     }
 
     private void photoIntentCreator() {
@@ -51,6 +128,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestPermission(){
+
         if(ContextCompat.checkSelfPermission(
                 this, Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED){
@@ -60,12 +138,13 @@ public class MainActivity extends AppCompatActivity {
                     REQUEST_CODE_STORAGE);
 
         }
+        else{
+            photoIntentCreator();
+        }
     }
 
     @Override
-    private void onRequestPermissionResult(int requestCode,
-                                           String[] permissions,
-                                           int[] grantResults){
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
 
         switch(requestCode){
 
@@ -85,11 +164,32 @@ public class MainActivity extends AppCompatActivity {
                      * If permission denied, show toast
                      */
 
-                    Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this,
+                            "Permission denied",
+                            Toast.LENGTH_SHORT).show();
 
                 }
             }
         }
 
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data){
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if( resultCode == RESULT_OK && requestCode == REQUEST_CODE){
+            Uri photoUri = data.getData();
+
+            ImageView memePhoto = (ImageView) this.findViewById(R.id.meme_photo_view);
+
+
+            /**
+             * Picasso external image library
+             */
+
+            Picasso.with(this).load(photoUri).into(memePhoto);
+
+        }
     }
 }
